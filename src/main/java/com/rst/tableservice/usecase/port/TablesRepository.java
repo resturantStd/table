@@ -13,9 +13,9 @@ public interface TablesRepository {
 
      Optional<Tables> getTable(Long tableId);
 
-     boolean updateStatus(TableStatusType statusType, Long tableId);
+     void updateStatus(TableStatusType statusType, Long tableId);
 
-     boolean reserve(Long tableId, LocalDateTime from, LocalDateTime to);
+     void reserve(Long tableId, LocalDateTime from);
 
      List<Tables> getAll();
 }
