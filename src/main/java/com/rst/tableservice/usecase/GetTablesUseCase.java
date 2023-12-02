@@ -11,6 +11,8 @@ import java.util.List;
 @Service
 public class GetTablesUseCase {
 
+
+
     private final TablesRepository tablesRepository;
 
     public GetTablesUseCase(TablesRepository tablesRepository) {

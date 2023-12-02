@@ -13,7 +13,7 @@ public interface TablesRepository {
 
      Optional<Tables> getTable(Long tableId);
 
-     boolean updateStatus(TableStatusType statusType);
+     boolean updateStatus(TableStatusType statusType, Long tableId);
 
      boolean reserve(Long tableId, LocalDateTime from, LocalDateTime to);
 
