@@ -33,7 +33,7 @@ public class ReserveTableProcessor {
     public ReserveTableProcessor(RedisTemplate<String, String> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
-
+/*
     @Scheduled(fixedDelay = 1000)
     public void execute() {
         log.info("process check reserved table is started {}", new Date());
@@ -49,5 +49,5 @@ public class ReserveTableProcessor {
                 }
             });
         });
-    }
+    }*/
 }
