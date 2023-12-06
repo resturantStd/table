@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  redis:
+    image: "redis:alpine"
+    environment:
+      - REDIS_PASSWORD=redis
+      - REDIS_PORT=6379
+      - REDIS_HOST=localhost
+      - REDIS_DATABASE=0
+      - REDIS_TIMEOUT=10000
+      - REDIS_POOL_MAX_TOTAL=100
+      - REDIS_POOL_MAX_IDLE=100
+      - REDIS_POOL_MIN_IDLE=10
+      - REDIS_POOL_MAX_WAIT_MILLIS=10000
+      - REDIS_POOL_MIN_EVICTABLE_IDLE_TIME_MILLIS=60000
+    ports:
+      - "6379:6379"
