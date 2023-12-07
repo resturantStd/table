@@ -9,3 +9,6 @@ spring:
     compose:
       enabled: true
       file: compose.yaml
+
+application-description: Table service
+application-version: v1
