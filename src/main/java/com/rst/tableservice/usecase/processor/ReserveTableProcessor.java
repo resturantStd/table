@@ -1,5 +1,6 @@
 package com.rst.tableservice.usecase.processor;
 
+import com.rst.tableservice.core.model.TableStatusType;
 import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,9 +40,12 @@ public class ReserveTableProcessor {
                 val triggerTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(time), UTC);
                 if (triggerTime.isBefore(LocalDateTime.now().plusMinutes(30))) {
                     tableConditionPort.deleteReservedTime(reservedTable.tableId(), triggerTime);
-
                     //TODO sand message to MQ to reserve table if the table is not occupied
                     log.info("table {} was unreserved", reservedTable);
+                } else if (triggerTime.isAfter(LocalDateTime.now().minusMinutes(30))) {
+                    tableConditionPort.updateStatus(TableStatusType.OCCUPIED, reservedTable.tableId());
+                    //TODO sand message to MQ to reserve table if the table is not occupied
+                    log.info("table {} is occupied", reservedTable);
                 }
             });
         });
