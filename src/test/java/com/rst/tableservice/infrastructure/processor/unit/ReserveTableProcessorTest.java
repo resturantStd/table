@@ -1,7 +1,26 @@
 package com.rst.tableservice.infrastructure.processor.unit;
 
-public class ReserveTableProcessorTest {
-/*
+import com.rst.tableservice.usecase.processor.ReserveTableProcessor;
+import org.junit.jupiter.api.BeforeEach;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisTemplate;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+
+class ReserveTableProcessorTest {
+
     @Mock
     private RedisTemplate<String, String> redisTemplate;
 
@@ -17,8 +36,8 @@ public class ReserveTableProcessorTest {
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
     }
 
-    @Test
-    public void shouldRemoveReservationWhenTimeIsGrateThanCurrentTime() {
+    //@Test
+    void shouldRemoveReservationWhenTimeIsGrateThanCurrentTime() {
         Set<Long> reserveTimeSet = new HashSet<>();
         long time = LocalDateTime.now().plusMinutes(35).toEpochSecond(ZoneOffset.UTC);
         reserveTimeSet.add(time);
@@ -30,8 +49,8 @@ public class ReserveTableProcessorTest {
         verify(hashOperations).delete(eq("table.reserve"), eq(1L));
     }
 
-    @Test
-    public void shouldNotRemoveReservationWhenTimeIsCurrentTime() {
+  //  @Test
+    void shouldNotRemoveReservationWhenTimeIsCurrentTime() {
         Set<Long> reserveTimeSet = new HashSet<>();
         reserveTimeSet.add(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC));
         when(hashOperations.entries("table.reserve"))
@@ -42,12 +61,12 @@ public class ReserveTableProcessorTest {
         verify(hashOperations, never()).delete(any(), any());
     }
 
-    @Test
-    public void shouldNotRemoveReservationWhenNoReservationsExist() {
+    //@Test
+    void shouldNotRemoveReservationWhenNoReservationsExist() {
         when(hashOperations.entries("table.reserve")).thenReturn(Map.of());
 
         reserveTableProcessor.execute();
 
         verify(hashOperations, never()).delete(any(), any());
-    }*/
+    }
 }

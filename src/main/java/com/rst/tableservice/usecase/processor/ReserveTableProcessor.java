@@ -40,6 +40,7 @@ public class ReserveTableProcessor {
                 val triggerTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(time), UTC);
                 if (triggerTime.isBefore(LocalDateTime.now().plusMinutes(30))) {
                     tableConditionPort.deleteReservedTime(reservedTable.tableId(), triggerTime);
+                    tableConditionPort.updateStatus(TableStatusType.AVAILABLE, reservedTable.tableId());
                     //TODO sand message to MQ to reserve table if the table is not occupied
                     log.info("table {} was unreserved", reservedTable);
                 } else if (triggerTime.isAfter(LocalDateTime.now().minusMinutes(30))) {

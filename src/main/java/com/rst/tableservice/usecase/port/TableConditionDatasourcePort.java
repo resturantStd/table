@@ -22,4 +22,6 @@ public interface TableConditionDatasourcePort {
     void deleteReservedTime(long tableId, LocalDateTime time);
 
     List<ReservedTable> getAllReservedTable();
+
+    void save(TableCondition tableCondition);
 }
