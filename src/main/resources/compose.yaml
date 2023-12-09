@@ -16,13 +16,13 @@ services:
     ports:
       - "6379:6379"
   mysql:
-    image: mysql:latest
+    image: mysql:8
     ports:
       - '3306:3306'
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=customers
-      - MYSQL_USER=customers
-      - MYSQL_PASSWORD=customers
+      - MYSQL_ROOT_PASSWORD=secret
+      - MYSQL_DATABASE=restaurant
+      - MYSQL_USER=sa
+      - MYSQL_PASSWORD=secret
     labels:
       org.springframework.boot.service-connection: mysql
