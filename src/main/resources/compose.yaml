@@ -15,3 +15,14 @@ services:
       - REDIS_POOL_MIN_EVICTABLE_IDLE_TIME_MILLIS=60000
     ports:
       - "6379:6379"
+  mysql:
+    image: mysql:latest
+    ports:
+      - '3306:3306'
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=customers
+      - MYSQL_USER=customers
+      - MYSQL_PASSWORD=customers
+    labels:
+      org.springframework.boot.service-connection: mysql

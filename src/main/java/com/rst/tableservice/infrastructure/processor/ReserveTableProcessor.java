@@ -1,5 +1,7 @@
 package com.rst.tableservice.infrastructure.processor;
 
+import com.rst.tableservice.usecase.port.TableConditionPort;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -27,27 +29,24 @@ import static java.time.ZoneOffset.UTC;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ReserveTableProcessor {
-    private final RedisTemplate<String, String> redisTemplate;
+    private final TableConditionPort tableConditionPort;
 
-    public ReserveTableProcessor(RedisTemplate<String, String> redisTemplate) {
-        this.redisTemplate = redisTemplate;
-    }
-/*
     @Scheduled(fixedDelay = 1000)
     public void execute() {
         log.info("process check reserved table is started {}", new Date());
-        Map<Object, Object> entries = redisTemplate.opsForHash().entries("table.reserve");
-        entries.forEach((key, value) -> {
-            val tableId = (Long) key;
-            val reserveTimeSet = (Set<Long>) value;
-            reserveTimeSet.forEach(time -> {
+        tableConditionPort.getAllReservedTable().forEach(reservedTable -> {
+            val reservedTime =  reservedTable.reservedTimes();
+            reservedTime.forEach(time -> {
                 val triggerTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(time), UTC);
-                if (triggerTime.isAfter(LocalDateTime.now().plusMinutes(30))) {
-                    redisTemplate.opsForHash().delete("table.reserve", tableId);
-                    log.info("tabel {} was unreserved", tableId);
+                if (triggerTime.isBefore(LocalDateTime.now().plusMinutes(30))) {
+                    tableConditionPort.deleteReservedTime(reservedTable.tableId(), triggerTime);
+
+                    //TODO sand message to MQ to reserve table if the table is not occupied
+                    log.info("table {} was unreserved", reservedTable);
                 }
             });
         });
-    }*/
+    }
 }
