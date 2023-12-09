@@ -22,6 +22,7 @@ public class Tables {
     @Column(name = "seat_capacity")
     private int seatsCapacity;
 
+
     @Override
     public final boolean equals(Object o) {
         if (this == o) return true;

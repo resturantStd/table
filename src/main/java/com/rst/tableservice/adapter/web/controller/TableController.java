@@ -16,7 +16,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/v1/api/tables")
+@RequestMapping("/v1/api")
 public class TableController {
 
     private final GetTablesUseCase getTablesUseCase;
@@ -33,13 +33,13 @@ public class TableController {
             @ApiResponse(responseCode = "400", description = "Invalid id supplied"),
             @ApiResponse(responseCode = "404", description = "Book not found")
     })
-    @GetMapping("/{id}")
+    @GetMapping("/tables/{id}")
     public Mono<TableResponse> getTable(@Parameter(description = "id of table to be searched") @PathVariable Long id) {
         return Mono.just(getTablesUseCase.getById(id))
                 .map(TableResponse::from);
     }
 
-    @GetMapping
+    @GetMapping("/tables")
     public Flux<TableResponse> getTables() {
         return Flux.fromIterable(getTablesUseCase.getAll())
                 .map(TableResponse::from);

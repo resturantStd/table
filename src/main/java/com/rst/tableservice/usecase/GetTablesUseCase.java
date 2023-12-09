@@ -3,7 +3,7 @@ package com.rst.tableservice.usecase;
 
 
 import com.rst.tableservice.core.model.Tables;
-import com.rst.tableservice.usecase.port.TablesPort;
+import com.rst.tableservice.usecase.port.TableDatasourcePort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -11,17 +11,17 @@ import java.util.List;
 @Service
 public class GetTablesUseCase {
 
-    private final TablesPort tablesPort;
+    private final TableDatasourcePort tableDatasourcePort;
 
-    public GetTablesUseCase(TablesPort tablesPort) {
-        this.tablesPort = tablesPort;
+    public GetTablesUseCase(TableDatasourcePort tableDatasourcePort) {
+        this.tableDatasourcePort = tableDatasourcePort;
     }
 
     public Tables getById(Long id) {
-        return tablesPort.getTableById(id).orElseThrow();
+        return tableDatasourcePort.getTableById(id).orElseThrow();
     }
 
     public List<Tables> getAll() {
-        return tablesPort.getAll();
+        return tableDatasourcePort.getAll();
     }
 }

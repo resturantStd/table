@@ -17,5 +17,6 @@ public class TableCondition {
     private long tableId;
     private boolean occupied;
     private String location;
+    TableStatusType status;
 
 }

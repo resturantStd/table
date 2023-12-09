@@ -1,18 +1,15 @@
-package com.rst.tableservice.infrastructure.processor;
+package com.rst.tableservice.usecase.processor;
 
-import com.rst.tableservice.usecase.port.TableConditionPort;
+import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Date;
-import java.util.Map;
-import java.util.Set;
 
 import static java.time.ZoneOffset.UTC;
 
@@ -31,7 +28,7 @@ import static java.time.ZoneOffset.UTC;
 @Component
 @RequiredArgsConstructor
 public class ReserveTableProcessor {
-    private final TableConditionPort tableConditionPort;
+    private final TableConditionDatasourcePort tableConditionPort;
 
     @Scheduled(fixedDelay = 1000)
     public void execute() {

@@ -1,24 +1,5 @@
 package com.rst.tableservice.infrastructure.processor.unit;
 
-import com.rst.tableservice.infrastructure.processor.ReserveTableProcessor;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.springframework.data.redis.core.HashOperations;
-import org.springframework.data.redis.core.RedisTemplate;
-
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-
 public class ReserveTableProcessorTest {
 /*
     @Mock
