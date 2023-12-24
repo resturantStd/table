@@ -12,7 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 
 import static java.time.ZoneOffset.UTC;
 
@@ -23,13 +23,10 @@ public class ReserveDatasource implements ReserveDatasourcePort {
     private static final String TABLE_RESERVED_KEY = "table.reserved.status";
     private final RedisTemplate<String, String> redisTemplate;
 
-
-
-
     @Override
     public void setTableReservationTime(long tableId, LocalDateTime time) {
         Optional.ofNullable(redisTemplate.opsForHash().get(TABLE_RESERVED_KEY, tableId))
-                .map(timeSet -> (Set<Long>) timeSet)
+                .map(mapToSetOfLong())
                 .ifPresentOrElse(timeSet -> {
                     timeSet.add(time.toEpochSecond(UTC));
                     redisTemplate.opsForHash().put(TABLE_RESERVED_KEY, tableId, timeSet);
@@ -38,19 +35,21 @@ public class ReserveDatasource implements ReserveDatasourcePort {
                 });
     }
 
+    private Function<Object, Set<Long>> mapToSetOfLong() {
+        return timeSet -> (Set<Long>) timeSet;
+    }
+
     @Override
     public Set<Long> getReservedTime(long tableId) {
         return Optional.ofNullable(redisTemplate.opsForHash().get(TABLE_RESERVED_KEY, tableId))
-                .map(time -> (Set<Long>) time)
+                .map(mapToSetOfLong())
                 .orElseGet(HashSet::new);
     }
-
-
 
     @Override
     public void deleteReservedTime(long tableId, LocalDateTime time) {
         Optional.ofNullable(redisTemplate.opsForHash().get(TABLE_RESERVED_KEY, tableId))
-                .map(timeSet -> (Set<Long>) timeSet)
+                .map(mapToSetOfLong())
                 .ifPresentOrElse(timeSet -> {
                     boolean removed = timeSet.remove(time.toEpochSecond(UTC));
                     if (!removed) {
@@ -76,6 +75,6 @@ public class ReserveDatasource implements ReserveDatasourcePort {
                         throw new RuntimeException("Invalid data in Redis", e);
                     }
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 }

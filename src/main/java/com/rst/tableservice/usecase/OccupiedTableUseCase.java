@@ -23,25 +23,29 @@ public class OccupiedTableUseCase {
     private final ReserveDatasourcePort reserveDatasourcePort;
 
     public void execute(long tableId) {
+        log.info("Try to occupy table {}", tableId);
         tableConditionDatasourcePort.getTableConditionByTableId(tableId)
                 .ifPresentOrElse(tableCondition -> {
                             validateIsTimeAvailable(tableCondition);
-                            tableConditionDatasourcePort.updateStatus(TableStatusType.OCCUPIED, tableId);
-
-                        }, () ->
-                                tableConditionDatasourcePort.save(
-                                        TableCondition.builder()
-                                                .tableId(tableId)
-                                                .occupied(true)
-                                                .status(TableStatusType.OCCUPIED)
-                                                .build()
-                                )
+                            tableCondition.setStatus(TableStatusType.OCCUPIED);
+                            tableCondition.setOccupied(true);
+                            tableConditionDatasourcePort.save(tableCondition);
+                            log.info("Table {} is occupied, condition was exist", tableId);
+                        }, () -> {
+                            tableConditionDatasourcePort.save(
+                                    TableCondition.builder()
+                                            .tableId(tableId)
+                                            .occupied(true)
+                                            .status(TableStatusType.OCCUPIED)
+                                            .build()
+                            );
+                            log.info("Table {} is occupied, condition was created", tableId);
+                        }
                 );
-
     }
 
     private void validateIsTimeAvailable(TableCondition tableCondition) {
-        if (tableCondition.isOccupied()) {
+        if (tableCondition.isOccupied() || tableCondition.getStatus() == TableStatusType.OCCUPIED) {
             throw new TableNotAvailableException(tableCondition.getTableId());
         }
 

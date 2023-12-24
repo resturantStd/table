@@ -1,11 +1,13 @@
 package com.rst.tableservice.usecase;
 
+import com.rst.tableservice.core.exception.TableNotFoundException;
 import com.rst.tableservice.core.exception.TimeNotAvailableException;
 import com.rst.tableservice.usecase.port.ReserveDatasourcePort;
 import com.rst.tableservice.usecase.port.TableDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -30,7 +32,7 @@ public class ReserveTableUseCase {
                     reserveDatasourcePort.setTableReservationTime(tableId, from);
                     log.info("Table {} is reserved from {}", tableId, from);
                 }, () -> {
-                    throw new RuntimeException("Table not found");
+                    throw new TableNotFoundException(tableId);
                 });
     }
 
@@ -41,6 +43,10 @@ public class ReserveTableUseCase {
    if the time is not available then throw exception
    */
     private void validateIsTimeAvailable(LocalDateTime from, Set<Long> timeSet, long tableId) {
+        if (CollectionUtils.isEmpty(timeSet)) {
+            return;
+        }
+
         timeSet.stream()
                 .map(time -> LocalDateTime.ofEpochSecond(time, 0, UTC))
                 .filter(triggerTime -> triggerTime.isAfter(from.minusMinutes(120)) && triggerTime.isBefore(from.plusMinutes(120)))

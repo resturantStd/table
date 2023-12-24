@@ -1,19 +1,23 @@
 package com.rst.tableservice.infrastructure.processor.unit;
 
+import com.rst.tableservice.core.model.ReservedTable;
+import com.rst.tableservice.core.model.TableStatusType;
+import com.rst.tableservice.usecase.port.ReserveDatasourcePort;
+import com.rst.tableservice.usecase.port.SanderPort;
+import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
 import com.rst.tableservice.usecase.processor.ReserveTableProcessor;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.data.redis.core.HashOperations;
-import org.springframework.data.redis.core.RedisTemplate;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
 
+import static java.time.ZoneOffset.UTC;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -22,10 +26,11 @@ import static org.mockito.Mockito.*;
 class ReserveTableProcessorTest {
 
     @Mock
-    private RedisTemplate<String, String> redisTemplate;
-
+    TableConditionDatasourcePort tableConditionPort;
     @Mock
-    private HashOperations<String, Object, Object> hashOperations;
+    ReserveDatasourcePort reserveDatasourcePort;
+    @Mock
+    SanderPort sanderPort;
 
     @InjectMocks
     private ReserveTableProcessor reserveTableProcessor;
@@ -33,40 +38,39 @@ class ReserveTableProcessorTest {
     @BeforeEach
     public void setup() {
         MockitoAnnotations.openMocks(this);
-        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
     }
 
-    //@Test
-    void shouldRemoveReservationWhenTimeIsGrateThanCurrentTime() {
-        Set<Long> reserveTimeSet = new HashSet<>();
-        long time = LocalDateTime.now().plusMinutes(35).toEpochSecond(ZoneOffset.UTC);
-        reserveTimeSet.add(time);
-        when(hashOperations.entries("table.reserve"))
-                .thenReturn(Map.of(1L, reserveTimeSet));
+    @Test
+    @DisplayName("should reserve table when  reservation time is less than 30 minutes")
+    void shouldReserveTableWhenParamsAllow() {
+        // Given
+        Long tableId = 1L;
+        Set<Long> reservationTimes = Set.of(LocalDateTime.now(UTC).plusMinutes(29).toEpochSecond(UTC));
+        when(reserveDatasourcePort.getAllReservedTable()).thenReturn(List.of(new ReservedTable(tableId, reservationTimes)));
 
+        // When
         reserveTableProcessor.execute();
 
-        verify(hashOperations).delete(eq("table.reserve"), eq(1L));
+        // Then
+        verify(tableConditionPort, times(1)).updateStatus(TableStatusType.OCCUPIED, tableId);
+        verify(sanderPort, times(1)).send("table.reserve", tableId, "table is occupied");
     }
 
-  //  @Test
-    void shouldNotRemoveReservationWhenTimeIsCurrentTime() {
-        Set<Long> reserveTimeSet = new HashSet<>();
-        reserveTimeSet.add(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC));
-        when(hashOperations.entries("table.reserve"))
-                .thenReturn(Map.of(1L, reserveTimeSet));
+    @Test
+    void shouldUnreserveTableWhenNextReservationTimeAbsentAndReservationTimeExpiredBy30Minutes() {
+        // Given
+        Long tableId = 1L;
+        Set<Long> reservationTimes = Set.of(LocalDateTime.now(UTC).minusMinutes(30).toEpochSecond(UTC));
+        when(reserveDatasourcePort.getAllReservedTable()).thenReturn(List.of(new ReservedTable(tableId, reservationTimes)));
 
+        // When
         reserveTableProcessor.execute();
 
-        verify(hashOperations, never()).delete(any(), any());
+        // Then
+        verify(reserveDatasourcePort, times(1)).deleteReservedTime(eq(tableId), any(LocalDateTime.class));
+        verify(tableConditionPort, times(1)).updateStatus(TableStatusType.AVAILABLE, tableId);
+        verify(sanderPort, times(1)).send("table.reserve", tableId, "table is unreserved");
     }
 
-    //@Test
-    void shouldNotRemoveReservationWhenNoReservationsExist() {
-        when(hashOperations.entries("table.reserve")).thenReturn(Map.of());
 
-        reserveTableProcessor.execute();
-
-        verify(hashOperations, never()).delete(any(), any());
-    }
 }

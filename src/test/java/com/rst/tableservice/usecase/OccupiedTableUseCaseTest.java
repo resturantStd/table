@@ -20,11 +20,6 @@ import static java.time.ZoneOffset.UTC;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
-/*
-* Тут не учитывается автоматическое освобождение столика через 30 минут после резерва
-* реализация ReserveTableProcessor
-*
-* */
 
 class OccupiedTableUseCaseTest {
 
@@ -57,7 +52,7 @@ class OccupiedTableUseCaseTest {
         occupiedTableUseCase.execute(tableId);
 
         //Then
-        verify(tableConditionDatasourcePort, times(1)).updateStatus(TableStatusType.OCCUPIED, tableId);
+        verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
     @Test
@@ -93,7 +88,7 @@ class OccupiedTableUseCaseTest {
         occupiedTableUseCase.execute(tableId);
 
         //Then
-        verify(tableConditionDatasourcePort, times(1)).updateStatus(TableStatusType.OCCUPIED, tableId);
+        verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
     @Test
@@ -115,7 +110,7 @@ class OccupiedTableUseCaseTest {
         occupiedTableUseCase.execute(tableId);
 
         //Then
-        verify(tableConditionDatasourcePort, times(1)).updateStatus(TableStatusType.OCCUPIED, tableId);
+        verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
     @Test

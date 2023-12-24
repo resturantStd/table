@@ -1,5 +1,6 @@
 package com.rst.tableservice.usecase.processor;
 
+import com.rst.tableservice.core.exception.TableNotFoundException;
 import com.rst.tableservice.core.model.TableCondition;
 import com.rst.tableservice.core.model.TableStatusType;
 import com.rst.tableservice.usecase.port.ReserveDatasourcePort;
@@ -38,16 +39,21 @@ public class ReserveTableProcessor {
 
 
     /*
-     * Лоигка работы:
-     * 1. Получаем все зарезервированные столики
-     * 2. Проверяем время резерва
-     * 3. Если время резерва больше 30 минут и стол не поменял статус на OCCUPAID, то столик освобождается - тут неогбходимо продумать как лучше сделать, так как стол может быть зарезервирован несколько раз и в разное время с промежутком 120 минут (по условию задачи)
-     * 4. Если время резерва больше 30 минут и стол поменял статус на  OCCUPAID, то столик не освобождается - тут неогбходимо продумать как лучше сделать, так как стол может быть зарезервирован несколько раз и в разное время с промежутком 120 минут (по условию задачи)
-     * 5. Если время резерва меньше 29 минут  то сол меняет флаг  что он занят на  true  (за 30 минут до резервирования стол меняет статус на OCCUPAID)
-     * Дополнительно:
-     *  необходимо добавить рассылку сообщений в MQ для резервирования столика, если столик не занят
+     * Working Logic:
      *
-     * */
+     * 1. Pre-reservation stage:
+     *    - 30 minutes prior to the reservation time, the system updates the status of the table to OCCUPIED.
+     *    - A message is then dispatched to the Message Queue (MQ) to notify relevant parties of this status change.
+     *    - Despite the status change, the 'occupied' flag remains false. This indicates that while the table is reserved, it is not yet physically occupied.
+     *    - At this stage, the table remains linked to the reservation.
+     *
+     * 2. Post-reservation stage:
+     *    - 30 minutes after the reservation time, the system performs two actions:
+     *        a. The table is disassociated from the reservation.
+     *        b. The status of the table is updated to AVAILABLE.
+     *    - Similar to the pre-reservation stage, the 'occupied' flag remains false even after these changes. This indicates that the table, while now available for new reservations, is not currently occupied.
+     */
+
 
     @Scheduled(fixedDelay = 1000)
     public void execute() {
@@ -57,27 +63,36 @@ public class ReserveTableProcessor {
             val reservedSize = reservedTime.size();
             reservedTime.forEach(time -> {
                 val triggerTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(time), UTC);
-                if (triggerTime.isAfter(LocalDateTime.now().plusMinutes(30))) {
-                    removeReservation(tableConditionPort.getTableConditionByTableId(reservedTable.tableId()).get(), triggerTime, reservedSize == 1);
-                    log.info("table {} was unreserved", reservedTable);
-                } else if (triggerTime.isAfter(LocalDateTime.now().minusMinutes(30)) && triggerTime.isBefore(LocalDateTime.now().plusMinutes(30))) {
-                    tableConditionPort.updateStatus(TableStatusType.OCCUPIED, reservedTable.tableId());
-                    sanderPort.send("table.reserve", reservedTable.tableId(), "table is occupied");
+                Long tableId = reservedTable.tableId();
+                LocalDateTime now = LocalDateTime.now(UTC);
+
+                log.info("table {} is reserved at {}", tableId, triggerTime);
+                if (triggerTime.isAfter(now) && triggerTime.isBefore(now.plusMinutes(30))) {
+                    tableConditionPort.updateStatus(TableStatusType.OCCUPIED, tableId);
+                    sanderPort.send("table.reserve", tableId, "table is occupied");
                     log.info("table {} is occupied", reservedTable);
+                } else if (triggerTime.isBefore(now) && triggerTime.plusMinutes(30).isBefore(now)) {
+                    var tableCondition = getTableCondition(tableId);
+                    removeReservation(tableCondition, triggerTime, reservedSize == 1);
+                    log.info("table {} was unreserved", reservedTable);
                 }
             });
         });
     }
 
+    private TableCondition getTableCondition(Long tableId) {
+        return tableConditionPort.getTableConditionByTableId(tableId).orElseThrow(() -> new TableNotFoundException(tableId));
+    }
 
     private void removeReservation(TableCondition tableCondition, LocalDateTime reservationTime, boolean isLastReservation) {
         long tableId = tableCondition.getTableId();
-        tableCondition.setStatus(isLastReservation ?
-                TableStatusType.AVAILABLE
+        tableCondition.setStatus(isLastReservation
+                ? TableStatusType.AVAILABLE
                 : TableStatusType.RESERVED);
 
         tableCondition.setOccupied(false);
         reserveDatasourcePort.deleteReservedTime(tableId, reservationTime);
+        tableConditionPort.save(tableCondition);
         sanderPort.send("table.reserve", tableId, "table is unreserved");
     }
 }
