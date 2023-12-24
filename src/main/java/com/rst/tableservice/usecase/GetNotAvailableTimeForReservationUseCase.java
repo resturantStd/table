@@ -1,13 +1,12 @@
 package com.rst.tableservice.usecase;
 
-import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
+import com.rst.tableservice.usecase.port.ReserveDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.time.ZoneOffset.UTC;
 
@@ -16,14 +15,14 @@ import static java.time.ZoneOffset.UTC;
 @RequiredArgsConstructor
 public class GetNotAvailableTimeForReservationUseCase {
 
-    private final TableConditionDatasourcePort tableConditionDatasourcePort;
+    private final ReserveDatasourcePort reserveDatasourcePort;
 
     //Get not available time for reservation
     public List<LocalDateTime> execute(Long tableId) {
         log.info("Get available time for table {}", tableId);
-        return tableConditionDatasourcePort.getReservedTime(tableId)
+        return reserveDatasourcePort.getReservedTime(tableId)
                 .stream()
                 .map(time -> LocalDateTime.ofEpochSecond(time, 0, UTC))
-                .collect(Collectors.toList());
+                .toList();
     }
 }

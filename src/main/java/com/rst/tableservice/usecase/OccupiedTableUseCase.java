@@ -1,7 +1,10 @@
 package com.rst.tableservice.usecase;
 
+import com.rst.tableservice.core.exception.TableNotAvailableException;
+import com.rst.tableservice.core.exception.TimeNotAvailableException;
 import com.rst.tableservice.core.model.TableCondition;
 import com.rst.tableservice.core.model.TableStatusType;
+import com.rst.tableservice.usecase.port.ReserveDatasourcePort;
 import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +20,7 @@ import static java.time.ZoneOffset.UTC;
 public class OccupiedTableUseCase {
 
     private final TableConditionDatasourcePort tableConditionDatasourcePort;
+    private final ReserveDatasourcePort reserveDatasourcePort;
 
     public void execute(long tableId) {
         tableConditionDatasourcePort.getTableConditionByTableId(tableId)
@@ -38,20 +42,24 @@ public class OccupiedTableUseCase {
 
     private void validateIsTimeAvailable(TableCondition tableCondition) {
         if (tableCondition.isOccupied()) {
-            throw new RuntimeException("Table is occupied");
+            throw new TableNotAvailableException(tableCondition.getTableId());
         }
 
         TableStatusType status = tableCondition.getStatus();
         if (status == TableStatusType.RESERVED) {
-            tableConditionDatasourcePort.getReservedTime(tableCondition.getTableId())
+            reserveDatasourcePort.getReservedTime(tableCondition.getTableId())
                     .stream()
                     .map(time -> LocalDateTime.ofEpochSecond(time, 0, UTC))
                     .filter(triggerTime -> triggerTime.isAfter(LocalDateTime.now(UTC).minusMinutes(120)) && triggerTime.isBefore(LocalDateTime.now(UTC).plusMinutes(120)))
                     .findFirst()
                     .ifPresent(triggerTime -> {
-                        throw new RuntimeException("Table is reserved");
+                        if (LocalDateTime.now(UTC).isAfter(triggerTime.plusMinutes(30))) {
+                            // If the current time is more than 30 minutes after the reservation time,
+                            // the table is no longer considered reserved.
+                            return;
+                        }
+                        throw new TimeNotAvailableException(tableCondition.getTableId());
                     });
         }
-
     }
 }

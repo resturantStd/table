@@ -1,6 +1,9 @@
 package com.rst.tableservice.usecase.processor;
 
+import com.rst.tableservice.core.model.TableCondition;
 import com.rst.tableservice.core.model.TableStatusType;
+import com.rst.tableservice.usecase.port.ReserveDatasourcePort;
+import com.rst.tableservice.usecase.port.SanderPort;
 import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,25 +33,51 @@ import static java.time.ZoneOffset.UTC;
 @RequiredArgsConstructor
 public class ReserveTableProcessor {
     private final TableConditionDatasourcePort tableConditionPort;
+    private final ReserveDatasourcePort reserveDatasourcePort;
+    private final SanderPort sanderPort;
+
+
+    /*
+     * Лоигка работы:
+     * 1. Получаем все зарезервированные столики
+     * 2. Проверяем время резерва
+     * 3. Если время резерва больше 30 минут и стол не поменял статус на OCCUPAID, то столик освобождается - тут неогбходимо продумать как лучше сделать, так как стол может быть зарезервирован несколько раз и в разное время с промежутком 120 минут (по условию задачи)
+     * 4. Если время резерва больше 30 минут и стол поменял статус на  OCCUPAID, то столик не освобождается - тут неогбходимо продумать как лучше сделать, так как стол может быть зарезервирован несколько раз и в разное время с промежутком 120 минут (по условию задачи)
+     * 5. Если время резерва меньше 29 минут  то сол меняет флаг  что он занят на  true  (за 30 минут до резервирования стол меняет статус на OCCUPAID)
+     * Дополнительно:
+     *  необходимо добавить рассылку сообщений в MQ для резервирования столика, если столик не занят
+     *
+     * */
 
     @Scheduled(fixedDelay = 1000)
     public void execute() {
         log.info("process check reserved table is started {}", new Date());
-        tableConditionPort.getAllReservedTable().forEach(reservedTable -> {
-            val reservedTime =  reservedTable.reservedTimes();
+        reserveDatasourcePort.getAllReservedTable().forEach(reservedTable -> {
+            val reservedTime = reservedTable.reservedTimes();
+            val reservedSize = reservedTime.size();
             reservedTime.forEach(time -> {
                 val triggerTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(time), UTC);
-                if (triggerTime.isBefore(LocalDateTime.now().plusMinutes(30))) {
-                    tableConditionPort.deleteReservedTime(reservedTable.tableId(), triggerTime);
-                    tableConditionPort.updateStatus(TableStatusType.AVAILABLE, reservedTable.tableId());
-                    //TODO sand message to MQ to reserve table if the table is not occupied
+                if (triggerTime.isAfter(LocalDateTime.now().plusMinutes(30))) {
+                    removeReservation(tableConditionPort.getTableConditionByTableId(reservedTable.tableId()).get(), triggerTime, reservedSize == 1);
                     log.info("table {} was unreserved", reservedTable);
-                } else if (triggerTime.isAfter(LocalDateTime.now().minusMinutes(30))) {
+                } else if (triggerTime.isAfter(LocalDateTime.now().minusMinutes(30)) && triggerTime.isBefore(LocalDateTime.now().plusMinutes(30))) {
                     tableConditionPort.updateStatus(TableStatusType.OCCUPIED, reservedTable.tableId());
-                    //TODO sand message to MQ to reserve table if the table is not occupied
+                    sanderPort.send("table.reserve", reservedTable.tableId(), "table is occupied");
                     log.info("table {} is occupied", reservedTable);
                 }
             });
         });
+    }
+
+
+    private void removeReservation(TableCondition tableCondition, LocalDateTime reservationTime, boolean isLastReservation) {
+        long tableId = tableCondition.getTableId();
+        tableCondition.setStatus(isLastReservation ?
+                TableStatusType.AVAILABLE
+                : TableStatusType.RESERVED);
+
+        tableCondition.setOccupied(false);
+        reserveDatasourcePort.deleteReservedTime(tableId, reservationTime);
+        sanderPort.send("table.reserve", tableId, "table is unreserved");
     }
 }

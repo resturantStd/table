@@ -1,7 +1,7 @@
 package com.rst.tableservice.usecase;
 
 import com.rst.tableservice.core.exception.TimeNotAvailableException;
-import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
+import com.rst.tableservice.usecase.port.ReserveDatasourcePort;
 import com.rst.tableservice.usecase.port.TableDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,17 +16,18 @@ import static java.time.ZoneOffset.UTC;
 @Service
 @RequiredArgsConstructor
 public class ReserveTableUseCase {
-    private final TableConditionDatasourcePort tableConditionDatasourcePort;
     private final TableDatasourcePort tableDatasourcePort;
+    private final ReserveDatasourcePort reserveDatasourcePort;
+
 
 
     public void execute(Long tableId, LocalDateTime from) {
         log.info("Reserve table {} from {}", tableId, from);
         tableDatasourcePort.getTableById(tableId)
                 .ifPresentOrElse(table -> {
-                    Set<Long> reservedTime = tableConditionDatasourcePort.getReservedTime(tableId);
+                    Set<Long> reservedTime = reserveDatasourcePort.getReservedTime(tableId);
                     validateIsTimeAvailable(from, reservedTime, tableId);
-                    tableConditionDatasourcePort.setTableReservationTime(tableId, from);
+                    reserveDatasourcePort.setTableReservationTime(tableId, from);
                     log.info("Table {} is reserved from {}", tableId, from);
                 }, () -> {
                     throw new RuntimeException("Table not found");
