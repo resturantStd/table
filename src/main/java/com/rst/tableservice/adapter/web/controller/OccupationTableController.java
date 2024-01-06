@@ -17,6 +17,6 @@ public class OccupationTableController {
 
     @GetMapping("/occupy")
     public Mono<Void> occupyTable(@RequestParam Long tableId) {
-        return Mono.fromRunnable(() -> occupiedTableUseCase.execute(tableId));
+        return occupiedTableUseCase.execute(tableId);
     }
 }

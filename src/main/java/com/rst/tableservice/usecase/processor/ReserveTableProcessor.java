@@ -81,7 +81,11 @@ public class ReserveTableProcessor {
     }
 
     private TableCondition getTableCondition(Long tableId) {
-        return tableConditionPort.getTableConditionByTableId(tableId).orElseThrow(() -> new TableNotFoundException(tableId));
+        return tableConditionPort.getTableConditionByTableId(tableId)
+                .onErrorResume(e -> {
+                    throw new TableNotFoundException(tableId);
+                })
+                .block();
     }
 
     private void removeReservation(TableCondition tableCondition, LocalDateTime reservationTime, boolean isLastReservation) {

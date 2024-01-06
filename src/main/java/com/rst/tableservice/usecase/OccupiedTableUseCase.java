@@ -9,6 +9,7 @@ import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 
@@ -22,29 +23,36 @@ public class OccupiedTableUseCase {
     private final TableConditionDatasourcePort tableConditionDatasourcePort;
     private final ReserveDatasourcePort reserveDatasourcePort;
 
-    public void execute(long tableId) {
+
+    public Mono<Void> execute(long tableId) {
         log.info("Try to occupy table {}", tableId);
-        tableConditionDatasourcePort.getTableConditionByTableId(tableId)
-                .ifPresentOrElse(tableCondition -> {
-                            validateIsTimeAvailable(tableCondition);
-                            tableCondition.setStatus(TableStatusType.OCCUPIED);
-                            tableCondition.setOccupied(true);
-                            tableConditionDatasourcePort.save(tableCondition);
-                            log.info("Table {} is occupied, condition was exist", tableId);
-                        }, () -> {
-                            tableConditionDatasourcePort.save(
-                                    TableCondition.builder()
-                                            .tableId(tableId)
-                                            .occupied(true)
-                                            .status(TableStatusType.OCCUPIED)
-                                            .build()
-                            );
-                            log.info("Table {} is occupied, condition was created", tableId);
-                        }
-                );
+        return tableConditionDatasourcePort.getTableConditionByTableId(tableId)
+                .defaultIfEmpty(TableCondition.builder()
+                        .tableId(tableId)
+                        .occupied(false)
+                        .status(TableStatusType.AVAILABLE)
+                        .build())
+                .flatMap(tableCondition -> {
+                    try {
+                        validateIsTimeAvailable(tableCondition);
+                        tableCondition.setStatus(TableStatusType.OCCUPIED);
+                        tableCondition.setOccupied(true);
+                        return Mono.just(tableCondition);
+                    } catch (Exception e) {
+                        return Mono.error(e);
+                    }
+                })
+                .doOnError(e -> log.error("Table {} occupation failed due to error: ", tableId, e))
+                .flatMap(tableCondition -> tableConditionDatasourcePort.save(tableCondition)
+                        .doOnSuccess(v -> log.info("Table {} is occupied, condition was saved", tableId))
+                        .then())
+                .then();
     }
 
+
     private void validateIsTimeAvailable(TableCondition tableCondition) {
+        LocalDateTime now = LocalDateTime.now(UTC);
+
         if (tableCondition.isOccupied() || tableCondition.getStatus() == TableStatusType.OCCUPIED) {
             throw new TableNotAvailableException(tableCondition.getTableId());
         }
@@ -54,16 +62,15 @@ public class OccupiedTableUseCase {
             reserveDatasourcePort.getReservedTime(tableCondition.getTableId())
                     .stream()
                     .map(time -> LocalDateTime.ofEpochSecond(time, 0, UTC))
-                    .filter(triggerTime -> triggerTime.isAfter(LocalDateTime.now(UTC).minusMinutes(120)) && triggerTime.isBefore(LocalDateTime.now(UTC).plusMinutes(120)))
-                    .findFirst()
-                    .ifPresent(triggerTime -> {
-                        if (LocalDateTime.now(UTC).isAfter(triggerTime.plusMinutes(30))) {
-                            // If the current time is more than 30 minutes after the reservation time,
-                            // the table is no longer considered reserved.
-                            return;
-                        }
-                        throw new TimeNotAvailableException(tableCondition.getTableId());
-                    });
+                    .filter(triggerTime -> triggerTime.isAfter(now.minusHours(2)) && triggerTime.isBefore(now.plusHours(2)))
+                    .sorted()
+                    .findFirst().ifPresent(triggerTime -> {
+                                if (now.minusHours(1).minusMinutes(29).isAfter(triggerTime)) {
+                                    return;
+                                }
+                                throw new TimeNotAvailableException(tableCondition.getTableId());
+                            }
+                    );
         }
     }
 }

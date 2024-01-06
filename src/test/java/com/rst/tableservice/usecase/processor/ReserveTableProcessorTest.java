@@ -12,10 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static java.time.ZoneOffset.UTC;
@@ -76,7 +76,7 @@ class ReserveTableProcessorTest {
 
         // When
         when(reserveDatasourcePort.getAllReservedTable()).thenReturn(List.of(new ReservedTable(tableId, reservationTimes)));
-        when(tableConditionPort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
+        when(tableConditionPort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
         reserveTableProcessor.execute();
 
         // Then

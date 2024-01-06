@@ -8,8 +8,7 @@ import com.rst.tableservice.infrastructure.db.redis.TableConditionRepository;
 import com.rst.tableservice.usecase.port.TableConditionDatasourcePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
+import reactor.core.publisher.Mono;
 
 @Repository
 @RequiredArgsConstructor
@@ -25,21 +24,21 @@ public class TableConditionDatasource implements TableConditionDatasourcePort {
             throw new InvalidStatusException("Invalid status");
         }
 
-        getTableConditionByTableId(tableId)
-                .ifPresentOrElse(tableCondition -> {
+        tableConditionRepository.getTableConditionByTableId(tableId)
+                .subscribe(tableCondition -> {
                     tableCondition.setStatus(statusType);
                     tableConditionRepository.save(tableCondition);
-                }, () -> {
-                    throw new TableNotFoundException(tableId);
+                }, error -> {
+                    throw new RuntimeException(new TableNotFoundException(tableId));
                 });
     }
 
     @Override
-    public Optional<TableCondition> getTableConditionByTableId(long tableId) {
+    public Mono<TableCondition> getTableConditionByTableId(long tableId) {
         return tableConditionRepository.getTableConditionByTableId(tableId);
     }
 
-    public void save(TableCondition tableCondition) {
-        tableConditionRepository.save(tableCondition);
+    public Mono<TableCondition> save(TableCondition tableCondition) {
+        return tableConditionRepository.save(tableCondition);
     }
 }

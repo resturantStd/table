@@ -1,12 +1,10 @@
 package com.rst.tableservice.infrastructure.db.redis;
 
 import com.rst.tableservice.core.model.TableCondition;
-import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Mono;
 
-import java.util.Optional;
-
-public interface TableConditionRepository extends CrudRepository<TableCondition, String> {
-
-
-    Optional<TableCondition> getTableConditionByTableId(Long tableId);
+public interface TableConditionRepository extends ReactiveCrudRepository<TableCondition, String> {
+    Mono<TableCondition> getTableConditionByTableId(Long tableId);
 }
+

@@ -1,6 +1,6 @@
 package com.rst.tableservice.usecase;
 
-
+import com.rst.tableservice.core.exception.TableNotAvailableException;
 import com.rst.tableservice.core.exception.TimeNotAvailableException;
 import com.rst.tableservice.core.model.TableCondition;
 import com.rst.tableservice.core.model.TableStatusType;
@@ -11,15 +11,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.Set;
 
 import static java.time.ZoneOffset.UTC;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
-
 
 class OccupiedTableUseCaseTest {
 
@@ -48,10 +47,17 @@ class OccupiedTableUseCaseTest {
                 .build();
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
-        occupiedTableUseCase.execute(tableId);
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
+
+        when(tableConditionDatasourcePort.save(any(TableCondition.class))).thenReturn(Mono.just(tableCondition).flatMap(tableCondition1 -> {
+            tableCondition1.setStatus(TableStatusType.OCCUPIED);
+            tableCondition1.setOccupied(true);
+            return Mono.just(tableCondition1);
+        }));
 
         //Then
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .verifyComplete();
         verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
@@ -62,10 +68,16 @@ class OccupiedTableUseCaseTest {
         long tableId = 1L;
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.empty());
-        occupiedTableUseCase.execute(tableId);
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.empty());
+        when(tableConditionDatasourcePort.save(any(TableCondition.class))).thenReturn(Mono.just(TableCondition.builder()
+                .tableId(tableId)
+                .occupied(true)
+                .status(TableStatusType.OCCUPIED)
+                .build()));
 
         //Then
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .verifyComplete();
         verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
@@ -82,12 +94,18 @@ class OccupiedTableUseCaseTest {
                 .build();
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
         when(reserveDatasourcePort.getReservedTime(tableId)).thenReturn(reservationTimes);
-
-        occupiedTableUseCase.execute(tableId);
+        when(tableConditionDatasourcePort.save(any(TableCondition.class))).thenReturn(Mono.just(tableCondition)
+                .flatMap(tableCondition1 -> {
+            tableCondition1.setStatus(TableStatusType.OCCUPIED);
+            tableCondition1.setOccupied(true);
+            return Mono.just(tableCondition1);
+        }));
 
         //Then
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .verifyComplete();
         verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
@@ -97,24 +115,32 @@ class OccupiedTableUseCaseTest {
         //Given
         long tableId = 1L;
         Set<Long> reservationTimes = Set.of();
-        TableCondition tableCondition = TableCondition.builder()
+        Mono<TableCondition> tableCondition = Mono.just(TableCondition.builder()
                 .tableId(tableId)
                 .occupied(false)
                 .status(TableStatusType.RESERVED)
-                .build();
+                .build());
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(tableCondition);
         when(reserveDatasourcePort.getReservedTime(tableId)).thenReturn(reservationTimes);
 
-        occupiedTableUseCase.execute(tableId);
+
+        when(tableConditionDatasourcePort.save(any(TableCondition.class))).thenReturn(tableCondition.flatMap(tableCondition1 -> {
+            tableCondition1.setStatus(TableStatusType.OCCUPIED);
+            tableCondition1.setOccupied(true);
+            return Mono.just(tableCondition1);
+        }));
+
 
         //Then
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .verifyComplete();
         verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
     @Test
-    @DisplayName("Should execute when table is occupied")
+    @DisplayName("Should throw exception when table is occupied")
     void shouldThrowExceptionWhenTableIsOccupied() {
         //Given
         long tableId = 1L;
@@ -125,9 +151,12 @@ class OccupiedTableUseCaseTest {
                 .build();
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
 
-        assertThrows(RuntimeException.class, () -> occupiedTableUseCase.execute(tableId));
+        //Then
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .expectError(TableNotAvailableException.class)
+                .verify();
     }
 
     @Test
@@ -135,7 +164,40 @@ class OccupiedTableUseCaseTest {
     void shouldThrowExceptionWhenTableIsReservedAndReservationTimesAreWithinTwoHours() {
         //Given
         long tableId = 1L;
-        Set<Long> reservationTimes = Set.of(LocalDateTime.now(UTC).minusMinutes(120).toEpochSecond(UTC), LocalDateTime.now(UTC).plusMinutes(120).toEpochSecond(UTC));
+        Set<Long> reservationTimes = Set.of(
+                                        LocalDateTime.now(UTC).minusHours(2).toEpochSecond(UTC),
+                                        LocalDateTime.now(UTC).plusHours(2).toEpochSecond(UTC)
+                                    );
+        //reservation time is now and the client is occupying the table
+        TableCondition tableCondition = TableCondition.builder()
+                .tableId(tableId)
+                .occupied(true)
+                .status(TableStatusType.RESERVED)
+                .build();
+
+        //When
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
+        when(reserveDatasourcePort.getReservedTime(tableId)).thenReturn(reservationTimes);
+
+        //Then
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .expectError(TableNotAvailableException.class)
+                .verify();
+    }
+
+
+    @Test
+    @DisplayName("Should not throw exception when table is reserved and reservation times are within 2 hours but table is not occupied")
+    void shouldNotThrowExceptionWhenTableIsReservedAndReservationTimesAreWithinTwoHours() {
+        //Given
+        long tableId = 1L;
+        Set<Long> reservationTimes = Set.of(
+                //table is reserved but not occupied yet
+                //reservation time is off after 30 minutes
+                LocalDateTime.now(UTC).minusHours(1).minusMinutes(31).toEpochSecond(UTC),
+                LocalDateTime.now(UTC).plusHours(2).toEpochSecond(UTC)
+        );
+
         TableCondition tableCondition = TableCondition.builder()
                 .tableId(tableId)
                 .occupied(false)
@@ -143,11 +205,18 @@ class OccupiedTableUseCaseTest {
                 .build();
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
         when(reserveDatasourcePort.getReservedTime(tableId)).thenReturn(reservationTimes);
+        when(tableConditionDatasourcePort.save(any(TableCondition.class))).thenReturn(Mono.just(tableCondition).flatMap(tableCondition1 -> {
+            tableCondition1.setStatus(TableStatusType.RESERVED);
+            tableCondition1.setOccupied(true);
+            return Mono.just(tableCondition1);
+        }));
 
         //Then
-        assertThrows(TimeNotAvailableException.class, () -> occupiedTableUseCase.execute(tableId));
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .verifyComplete();
+        verify(tableConditionDatasourcePort, times(1)).save(any(TableCondition.class));
     }
 
     @Test
@@ -163,11 +232,32 @@ class OccupiedTableUseCaseTest {
                 .build();
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
         when(reserveDatasourcePort.getReservedTime(tableId)).thenReturn(reservationTimes);
 
         //Then
-        assertThrows(TimeNotAvailableException.class, () -> occupiedTableUseCase.execute(tableId));
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .expectError(TimeNotAvailableException.class)
+                .verify();
+    }
+
+    @Test
+    public void testexecute_throwsTimeNotAvailableException() {
+        // Arrange
+        long tableId = 1;
+        TableCondition tableCondition = TableCondition.builder()
+                .tableId(tableId)
+                .occupied(false)
+                .status(TableStatusType.RESERVED)
+                .build();
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
+        LocalDateTime reservationTime = LocalDateTime.now(UTC).minusMinutes(20);
+        when(reserveDatasourcePort.getReservedTime(tableId)).thenReturn(Set.of(reservationTime.toEpochSecond(UTC)));
+
+        // Act & Assert
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .expectError(TimeNotAvailableException.class)
+                .verify();
     }
 
     @Test
@@ -183,10 +273,12 @@ class OccupiedTableUseCaseTest {
                 .build();
 
         //When
-        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Optional.of(tableCondition));
+        when(tableConditionDatasourcePort.getTableConditionByTableId(tableId)).thenReturn(Mono.just(tableCondition));
         when(reserveDatasourcePort.getReservedTime(tableId)).thenReturn(reservationTimes);
 
         //Then
-        assertThrows(RuntimeException.class, () -> occupiedTableUseCase.execute(tableId));
+        StepVerifier.create(occupiedTableUseCase.execute(tableId))
+                .expectError(TimeNotAvailableException.class)
+                .verify();
     }
 }
